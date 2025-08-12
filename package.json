@@ -4,6 +4,7 @@
     "description": "A starter project for Three.js with support for ES6 and Webpack 5",
     "scripts": {
         "build": "webpack --config webpack.prod.js --progress --env production",
+        "build:prod": "webpack --config webpack.prod.js",
         "start": "webpack serve --mode development --config ./webpack.dev.js --open",
         "ci": "yarn run test && yarn run coverage",
         "deploy": "npx gh-pages -d build",
@@ -37,9 +38,9 @@
         "html-webpack-plugin": "^5.5.0",
         "image-webpack-loader": "^8.1.0",
         "mini-css-extract-plugin": "^2.6.1",
-        "node-sass": "^7.0.3",
         "prettier": "^2.3.2",
         "rimraf": "^3.0.2",
+        "sass": "^1.90.0",
         "sass-loader": "^13.1.0",
         "style-loader": "^3.3.1",
         "webpack": "^5.46.0",

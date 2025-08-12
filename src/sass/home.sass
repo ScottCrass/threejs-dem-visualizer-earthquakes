@@ -1,7 +1,7 @@
-@import 'colors'
-@import 'geometry'
-@import 'typography'
-@import 'timeline'
+@use 'colors'
+@use 'geometry'
+@use 'typography'
+@use 'timeline'
 
 
 body 
@@ -21,9 +21,9 @@ body
     pointer-events: none
 
 h1
-  color: $header-color
-  font-family: $header-font-family
-  font-size: $header-font-size
+  color: colors.$header-color
+  font-family: typography.$header-font-family
+  font-size: typography.$header-font-size
 
 .container
   height: 80%
