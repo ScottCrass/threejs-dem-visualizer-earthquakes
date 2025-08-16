@@ -653,7 +653,26 @@ class Application {
         // The bloom pass strength adjustment is sufficient for controlling glow intensity
       }
     });
-    
+      
+    function setLoadButtonLoading(isLoading) {
+      const loadButton = document.getElementById('load-data-btn');
+      if (loadButton) {
+        if (isLoading) {
+          loadButton.innerHTML = `
+            <svg id="spiner" width="22" height="22" viewBox="0 0 50 50" style="vertical-align:middle; margin:5px;">
+              <circle cx="25" cy="25" r="20" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-dasharray="31.4 94.2" stroke-dashoffset="0">
+                <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite"/>
+              </circle>
+            </svg>
+          `;
+          loadButton.disabled = true;
+        } else {
+          loadButton.innerHTML = 'Load Data';
+          loadButton.disabled = false;
+        }
+      }
+    }
+
     // Add event listener for loading earthquake data with custom date range
     document.addEventListener('loadEarthquakeData', (event) => {
       const { startDate, endDate } = event.detail;
@@ -661,6 +680,9 @@ class Application {
       
       // Clear existing earthquake objects
       this.earthquakeOverlay.clearData();
+
+      // Set button to loading state
+      setLoadButtonLoading(true);
       
       // Load new data with the specified date range
       this.earthquakeOverlay.loadData(this.terrainBounds, startDate, endDate)
@@ -671,9 +693,13 @@ class Application {
           
           // Configure earthquake objects for interaction
           this.configureEarthquakesForClicking();
+
+          setLoadButtonLoading(false);
+
         })
         .catch(error => {
           console.error('Failed to load earthquake data for date range:', error);
+          setLoadButtonLoading(false);
         });
     });
   }

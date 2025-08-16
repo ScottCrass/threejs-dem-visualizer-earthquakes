@@ -115,6 +115,7 @@ export function createEarthquakeControls() {
   
   // Load data button
   const loadButton = document.createElement('button');
+  loadButton.id = 'load-data-btn';
   loadButton.textContent = 'Load Data';
   loadButton.style.width = '100%';
   loadButton.style.padding = '5px';
@@ -137,14 +138,6 @@ export function createEarthquakeControls() {
           detail: { startDate, endDate }
         });
         document.dispatchEvent(loadDataEvent);
-        
-        // Visual feedback
-        loadButton.textContent = 'Loading...';
-        loadButton.disabled = true;
-        setTimeout(() => {
-          loadButton.textContent = 'Load Data';
-          loadButton.disabled = false;
-        }, 2000);
       } else {
         alert('Start date must be before or equal to end date');
       }
