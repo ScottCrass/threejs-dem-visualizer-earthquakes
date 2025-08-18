@@ -232,6 +232,70 @@ export class EarthquakeOverlay {
       entry.line.material.opacity = opacity;
 
       activeIds.add(feature.id);
+      
+      bloomColor.multiplyScalar(bloomMultiplier);
+      
+      // Create a sphere for the earthquake with higher quality geometry
+      const sphereGeometry = new SphereGeometry(size * 2, 16, 16); // Increased segments for smoother bloom
+      
+      // Use a simple MeshBasicMaterial for better bloom performance
+      const material = new MeshBasicMaterial({
+        color: bloomColor,
+        transparent: true,
+        opacity: 1.0, // Full opacity - let bloom layer handle the glow
+      });
+      
+      const sphere = new Mesh(sphereGeometry, material);
+      sphere.position.set(position.x, position.z, position.y); // Note the swapped y and z for Three.js
+      
+      // Set earthquake on both layers for proper functionality:
+      // - Layer 0 for raycasting and terrain compatibility
+      // - Bloom layer for glow effect
+      sphere.layers.set(0); // Start with layer 0 (raycasting)
+      sphere.layers.enable(this.bloomLayer); // Add bloom layer for glow
+      
+      // DEBUG: Log actual layer mask after setting
+      console.log(`Earthquake sphere created - bloomLayer: ${this.bloomLayer}, layers mask: ${sphere.layers.mask}`);
+      
+      // Scale up immediately for easier clicking (no delayed scaling)
+      sphere.scale.setScalar(3.0);
+      
+      // CRITICAL FIX: Disable frustum culling to ensure earthquakes are always raycastable
+      // This prevents Three.js from culling small spheres that appear outside the camera frustum
+      sphere.frustumCulled = false;
+      
+      // Add user data for interaction
+      sphere.userData = {
+        earthquake: feature.properties,
+        depth,
+        magnitude: mag,
+        time,
+        isEarthquake: true // Flag to identify as an earthquake object
+      };
+      
+      // Add a line from the surface to the earthquake depth
+      const lineGeometry = new BufferGeometry();
+      const lineVertices = new Float32Array([
+        position.x, 0, position.y,
+        position.x, position.z, position.y
+      ]);
+      lineGeometry.setAttribute('position', new Float32BufferAttribute(lineVertices, 3));
+      
+      const lineMaterial = new LineBasicMaterial({
+        color: new Color(this.ageColor(ageInHours)).multiplyScalar(2.0), // Color matches sphere now
+        transparent: true,
+        opacity: 1 // Fixed opacity for consistent glow
+      });
+      
+      const line = new Line(lineGeometry, lineMaterial);
+      
+      // Put lines only on layer 0 (non-bloom layer) to avoid bloom artifacts
+      line.layers.set(0); // Only layer 0, not bloom layer
+    
+      // No age-based opacity changes - keep lines consistent
+      
+      this.group.add(sphere);
+      this.group.add(line);
     });
 
     // cleanup old
@@ -261,6 +325,7 @@ export class EarthquakeOverlay {
    * @param {number} ageInHours
    * @returns {number} - hex color
    */
+
   ageColor(ageInHours) {
     if (ageInHours < 0) return 0xff0000;
     if (ageInHours <= 2) return 0xff0000;
