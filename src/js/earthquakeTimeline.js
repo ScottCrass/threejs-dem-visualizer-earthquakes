@@ -52,17 +52,17 @@ export function createEarthquakeTimeline(earthquakeOverlay, terrainBounds) {
   controlsContainer.style.gap = '10px';
   
   const playButton = document.createElement('button');
-  playButton.textContent = '▶️ Play';
+  playButton.textContent = '▶ Play';
   playButton.style.padding = '5px 10px';
   playButton.style.cursor = 'pointer';
   
   const pauseButton = document.createElement('button');
-  pauseButton.textContent = '⏸️ Pause';
+  pauseButton.textContent = '⏸ Pause';
   pauseButton.style.padding = '5px 10px';
   pauseButton.style.cursor = 'pointer';
   
   const stopButton = document.createElement('button');
-  stopButton.textContent = '⏹️ Stop';
+  stopButton.textContent = '⏹ Stop';
   stopButton.style.padding = '5px 10px';
   stopButton.style.cursor = 'pointer';
   

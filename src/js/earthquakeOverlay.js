@@ -284,9 +284,9 @@ export class EarthquakeOverlay {
       lineGeometry.setAttribute('position', new Float32BufferAttribute(lineVertices, 3));
       
       const lineMaterial = new LineBasicMaterial({
-        color: new Color(0xffff00).multiplyScalar(2.0), // Brighter yellow for bloom layer
+        color: new Color(this.ageColor(ageInHours)).multiplyScalar(2.0), // Color matches sphere now
         transparent: true,
-        opacity: 0.6 // Fixed opacity for consistent glow
+        opacity: 1 // Fixed opacity for consistent glow
       });
       
       const line = new Line(lineGeometry, lineMaterial);
@@ -311,6 +311,7 @@ export class EarthquakeOverlay {
    * @param {number} ageInHours - Age of earthquake in hours relative to timeline
    * @returns {number} - Color value
    */
+
   ageColor(ageInHours) {
     // Handle future earthquakes (relative to timeline) - make them very bright red
     if (ageInHours < 0) {
