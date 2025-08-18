@@ -143,7 +143,7 @@ class Application {
       alpha: false, // Disable alpha to prevent transparency issues
       powerPreference: "high-performance",
     });
-    this.renderer.setClearColor(0x000011, 1.0); // Dark blue-black with full alpha
+    this.renderer.setClearColor(0x0a0a0a, 1.0); // Dark with full alpha
     this.renderer.setPixelRatio(window.devicePixelRatio || 1);
     this.renderer.setSize(this.width, this.height);
     this.renderer.shadowMap.enabled = true;
@@ -183,10 +183,10 @@ class Application {
   }
 
   setupCamera() {
-    const fov = 75;
+    const fov = 750;
     const aspect = this.width / this.height;
     const near = 0.1;
-    const far = 10000;
+    const far = 100000;
     this.camera = new PerspectiveCamera(fov, aspect, near, far);
     this.camera.position.set(1000, 1000, 1000);
     this.camera.lookAt(this.scene.position);
@@ -195,7 +195,7 @@ class Application {
   setupControls() {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enabled = true;
-    this.controls.maxDistance = 1500;
+    this.controls.maxDistance = 15000;
     this.controls.minDistance = 0;
     this.controls.autoRotate = false; // Disable automatic rotation
   }
@@ -347,6 +347,8 @@ class Application {
       // Store reference to terrain mesh for opacity control
       this.terrainMesh = mountain;
       
+
+      
       this.scene.add(mountain);
 
 
@@ -378,7 +380,8 @@ class Application {
   }
 
   setupHelpers() {
-    const gridHelper = new GridHelper(1000, 40, 0x222222, 0x222222);
+    const gridHelper = new GridHelper(1000, 40, 0x423d36, 0x423d36); // Very dark gray to prevent bloom
+    gridHelper.layers.set(1); // Set to default layer, not bloom
     this.scene.add(gridHelper);
     
     this.initCompassRotation();
@@ -396,30 +399,31 @@ class Application {
       console.warn('Compass element not found - will retry after DOM is ready');
     }
   }
-  
+    
   updateCompassRotation() {
-    // Update compass rotation in render loop
-    if (this.compassElement && this.camera) {
-      // Since the terrain mesh is rotated 90° around X-axis, we need to account for this
-      // The mesh rotation essentially transforms the coordinate system:
-      // - The mesh's "up" direction (originally Z) becomes Y
-      // - The mesh's Y direction becomes -Z
-      // - X remains X but the mesh is now flipped horizontally with scale.x = -1
+    if (this.compassElement && this.controls) {
+
+      let azimuthal = this.controls.getAzimuthalAngle();
+      let rotation = THREE.MathUtils.radToDeg(azimuthal);
+
+      const polar = this.controls.getPolarAngle();
+      if (polar > Math.PI / 2) {
+        rotation = -rotation
+        rotation -= 180
+      }
+
+      rotation = -rotation;
+      rotation -= 90;
+      rotation *= -1;
       
-      // Get camera position relative to scene center
-      const cameraPos = this.camera.position.clone();
-      
-      // For the rotated and flipped terrain system:
-      // Use -X and Y coordinates to account for both the 90° rotation and horizontal flip
-      const angle = Math.atan2(-cameraPos.x, cameraPos.y);
-      
-      // Convert to degrees - no additional offset needed since we've corrected the coordinates
-      const rotation = THREE.MathUtils.radToDeg(angle);
+      rotation -= 270
+
+      rotation = (rotation % 360 + 360) % 360;
+
       this.compassElement.style.transform = `rotate(${rotation}deg)`;
     }
   }
-  
-  
+
   configureEarthquakesForClicking() {
     // Configure earthquake objects for interaction after they're created/recreated
     this.earthquakeOverlay.getObject3D().children.forEach((child) => {
@@ -549,7 +553,26 @@ class Application {
         // The bloom pass strength adjustment is sufficient for controlling glow intensity
       }
     });
-    
+      
+    function setLoadButtonLoading(isLoading) {
+      const loadButton = document.getElementById('load-data-btn');
+      if (loadButton) {
+        if (isLoading) {
+          loadButton.innerHTML = `
+            <svg id="spiner" width="22" height="22" viewBox="0 0 50 50" style="vertical-align:middle; margin:5px;">
+              <circle cx="25" cy="25" r="20" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-dasharray="31.4 94.2" stroke-dashoffset="0">
+                <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite"/>
+              </circle>
+            </svg>
+          `;
+          loadButton.disabled = true;
+        } else {
+          loadButton.innerHTML = 'Load Data';
+          loadButton.disabled = false;
+        }
+      }
+    }
+
     // Add event listener for loading earthquake data with custom date range
     document.addEventListener('loadEarthquakeData', (event) => {
       const { startDate, endDate } = event.detail;
@@ -557,6 +580,9 @@ class Application {
       
       // Clear existing earthquake objects
       this.earthquakeOverlay.clearData();
+
+      // Set button to loading state
+      setLoadButtonLoading(true);
       
       // Load new data with the specified date range
       this.earthquakeOverlay.loadData(this.terrainBounds, startDate, endDate)
@@ -567,9 +593,13 @@ class Application {
           
           // Configure earthquake objects for interaction
           this.configureEarthquakesForClicking();
+
+          setLoadButtonLoading(false);
+
         })
         .catch(error => {
           console.error('Failed to load earthquake data for date range:', error);
+          setLoadButtonLoading(false);
         });
     });
   }

@@ -33,6 +33,17 @@ export class EarthquakeOverlay {
     this.onTimeRangeChange = null;
     this.onTimeChange = null;
     this.onVisualize = null; // Called after visualization is complete
+    
+    // Bloom layer
+    this.bloomLayer = 1; // Default to layer 1
+  }
+  
+  /**
+   * Set the layer to use for bloom effect
+   * @param {number} layer - Layer number for bloom effect
+   */
+  setBloomLayer(layer) {
+    this.bloomLayer = layer;
   }
 
   /**
@@ -239,6 +250,15 @@ export class EarthquakeOverlay {
       const sphere = new Mesh(sphereGeometry, material);
       sphere.position.set(position.x, position.z, position.y); // Note the swapped y and z for Three.js
       
+      // Set earthquake on both layers for proper functionality:
+      // - Layer 0 for raycasting and terrain compatibility
+      // - Bloom layer for glow effect
+      sphere.layers.set(0); // Start with layer 0 (raycasting)
+      sphere.layers.enable(this.bloomLayer); // Add bloom layer for glow
+      
+      // DEBUG: Log actual layer mask after setting
+      console.log(`Earthquake sphere created - bloomLayer: ${this.bloomLayer}, layers mask: ${sphere.layers.mask}`);
+      
       // Scale up immediately for easier clicking (no delayed scaling)
       sphere.scale.setScalar(3.0);
       
@@ -264,13 +284,16 @@ export class EarthquakeOverlay {
       lineGeometry.setAttribute('position', new Float32BufferAttribute(lineVertices, 3));
       
       const lineMaterial = new LineBasicMaterial({
-        color: new Color(0xffff00), // Regular yellow (no brightness multiplier for non-bloom)
+        color: new Color(this.ageColor(ageInHours)).multiplyScalar(2.0), // Color matches sphere now
         transparent: true,
-        opacity: 0.6 // Fixed opacity for consistent appearance
+        opacity: 1 // Fixed opacity for consistent glow
       });
       
       const line = new Line(lineGeometry, lineMaterial);
       
+      // Put lines only on layer 0 (non-bloom layer) to avoid bloom artifacts
+      line.layers.set(0); // Only layer 0, not bloom layer
+    
       // No age-based opacity changes - keep lines consistent
       
       this.group.add(sphere);
@@ -288,6 +311,7 @@ export class EarthquakeOverlay {
    * @param {number} ageInHours - Age of earthquake in hours relative to timeline
    * @returns {number} - Color value
    */
+
   ageColor(ageInHours) {
     // Handle future earthquakes (relative to timeline) - make them very bright red
     if (ageInHours < 0) {
