@@ -22,33 +22,34 @@
         "three": "^0.179.1"
     },
     "devDependencies": {
-        "@babel/core": "^7.19.6",
+        "@babel/core": "^7.28.3",
         "@babel/eslint-parser": "^7.19.1",
-        "@babel/preset-env": "^7.19.4",
+        "@babel/preset-env": "^7.28.3",
+        "@eslint/js": "^9.33.0",
         "clean-webpack-plugin": "^4.0.0",
-        "compression-webpack-plugin": "^10.0.0",
-        "css-loader": "^6.7.1",
-        "esbuild-loader": "^2.20.0",
-        "eslint": "^8.25.0",
-        "eslint-config-prettier": "^8.5.0",
-        "eslint-plugin-prettier": "^4.2.1",
-        "eslint-webpack-plugin": "^3.2.0",
+        "compression-webpack-plugin": "^11.1.0",
+        "css-loader": "^7.1.2",
+        "esbuild-loader": "^4.3.0",
+        "eslint": "^9.33.0",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-prettier": "^5.5.4",
+        "eslint-webpack-plugin": "^5.0.2",
         "file-loader": "^6.2.0",
-        "gh-pages": "^4.0.0",
-        "html-webpack-plugin": "^5.5.0",
+        "gh-pages": "^6.3.0",
+        "html-webpack-plugin": "^5.6.4",
         "image-webpack-loader": "^8.1.0",
         "mini-css-extract-plugin": "^2.6.1",
-        "prettier": "^2.3.2",
-        "rimraf": "^3.0.2",
+        "prettier": "^3.6.2",
+        "rimraf": "^6.0.1",
         "sass": "^1.90.0",
-        "sass-loader": "^13.1.0",
-        "style-loader": "^3.3.1",
-        "webpack": "^5.46.0",
+        "sass-loader": "^16.0.5",
+        "style-loader": "^4.0.0",
+        "webpack": "^5.101.3",
         "webpack-bundle-analyzer": "^4.6.1",
-        "webpack-cli": "^4.10.0",
-        "webpack-dev-server": "^4.11.1",
+        "webpack-cli": "^6.0.1",
+        "webpack-dev-server": "^5.2.2",
         "webpack-glsl-loader": "^1.0.1",
-        "webpack-merge": "^5.8.0"
+        "webpack-merge": "^6.0.1"
     },
     "keywords": [
         "threejs",
@@ -62,5 +63,6 @@
     "bugs": {
         "url": "https://github.com/orabazu/threejs-dem-visualizer/issues"
     },
-    "homepage": "https://github.com/orabazu/threejs-dem-visualizer"
+    "homepage": "https://github.com/orabazu/threejs-dem-visualizer",
+    "packageManager": "yarn@4.9.2"
 }
