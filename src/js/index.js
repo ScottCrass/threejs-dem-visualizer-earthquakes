@@ -17,7 +17,6 @@ import {
 } from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'; // import min because three.js is not tree-shakable for now
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import * as Detector from '../js/vendor/Detector';
@@ -59,19 +58,6 @@ class Application {
     };
     
     console.log('Terrain bounds will be extracted from GeoTIFF metadata...');
-    
-    // Layer for bloom effect
-    this.BLOOM_SCENE = 1;
-    this.bloomLayer = new THREE.Layers();
-    this.bloomLayer.set(this.BLOOM_SCENE);
-    
-    // Materials for selective bloom
-    this.darkMaterial = new THREE.MeshBasicMaterial({ 
-      color: 'black',
-      transparent: false, // Start as non-transparent
-      opacity: 1.0
-    });
-    this.materials = {};
 
     if (opts.container) {
       this.container = opts.container;
@@ -123,6 +109,11 @@ class Application {
       if (this.finalComposer) {
         this.finalComposer.setSize(w, h);
       }
+      
+      // Update bloom pass resolution for proper circular bloom
+      if (this.bloomPass) {
+        this.bloomPass.resolution.set(w, h);
+      }
     });
     
     // Now that the camera is initialized, set up the bloom effect
@@ -131,58 +122,12 @@ class Application {
 
   render() {
     this.controls.update();
-    
-    // Update compass rotation based on camera direction
     this.updateCompassRotation();
     
-    // Selective bloom rendering process with proper terrain opacity handling
-    // Step 1: Darken non-bloom objects for bloom pass
-    this.scene.traverse(obj => this.darkenNonBloomed(obj));
-    this.bloomComposer.render();
-    
-    // Step 2: Restore original materials
-    this.scene.traverse(obj => this.restoreMaterial(obj));
-    
-    // Step 3: Render final combined result
+    this.camera.layers.enableAll();
     this.finalComposer.render();
     
-    // Continue animation loop
     requestAnimationFrame(() => this.render());
-  }
-  
-  // Helper functions for selective bloom
-  darkenNonBloomed(obj) {
-    if (obj.isMesh && this.bloomLayer.test(obj.layers) === false) {
-      this.materials[obj.uuid] = obj.material;
-      
-      // For terrain mesh, create a special dark material that respects opacity
-      if (obj.userData && obj.userData.isTerrain) {
-        const darkMat = new THREE.MeshBasicMaterial({
-          color: 'black',
-          transparent: obj.material.transparent,
-          opacity: obj.material.opacity,
-          alphaTest: obj.material.alphaTest,
-          side: obj.material.side,
-          depthWrite: obj.material.depthWrite,
-          depthTest: obj.material.depthTest
-        });
-        obj.material = darkMat;
-      } else {
-        // For other objects, use the standard dark material approach
-        const darkMat = this.darkMaterial.clone();
-        darkMat.transparent = obj.material.transparent;
-        darkMat.opacity = obj.material.opacity;
-        darkMat.alphaTest = obj.material.alphaTest;
-        obj.material = darkMat;
-      }
-    }
-  }
-  
-  restoreMaterial(obj) {
-    if (this.materials[obj.uuid]) {
-      obj.material = this.materials[obj.uuid];
-      delete this.materials[obj.uuid];
-    }
   }
 
   static createContainer() {
@@ -202,7 +147,7 @@ class Application {
     this.renderer.setPixelRatio(window.devicePixelRatio || 1);
     this.renderer.setSize(this.width, this.height);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.outputEncoding = THREE.sRGBEncoding; // Improved color rendering
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace; // Improved color rendering
     
     // Ensure consistent texture handling
     this.renderer.toneMapping = THREE.NoToneMapping;
@@ -216,67 +161,25 @@ class Application {
   }
   
   setupBloom() {
-    // Proper selective bloom implementation based on Three.js example
-    
+    // Simple single-pass bloom with proper depth testing
     const renderScene = new RenderPass(this.scene, this.camera);
+    renderScene.clearColor = new THREE.Color(0x000011);
+    renderScene.clearAlpha = 1.0;
     
-    // Create bloom pass for selective bloom
     const bloomPass = new UnrealBloomPass(
       new Vector2(window.innerWidth, window.innerHeight),
-      1.5,  // strength
-      0.4,  // radius  
-      0.1   // threshold - very low to ensure immediate bloom on red earthquakes
+      0.5,  // strength
+      0.8,  // radius  
+      0.8   // threshold - prevents terrain from blooming
     );
     
     this.bloomPass = bloomPass;
     
-    // Bloom composer - renders only bloom objects
-    this.bloomComposer = new EffectComposer(this.renderer);
-    this.bloomComposer.renderToScreen = false;
-    this.bloomComposer.addPass(renderScene);
-    this.bloomComposer.addPass(bloomPass);
-    
-    // Mix pass - combines normal scene with bloom texture
-    const mixPass = new ShaderPass(
-      new THREE.ShaderMaterial({
-        uniforms: {
-          baseTexture: { value: null },
-          bloomTexture: { value: this.bloomComposer.renderTarget2.texture }
-        },
-        vertexShader: `
-          varying vec2 vUv;
-          void main() {
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-          }
-        `,
-        fragmentShader: `
-          uniform sampler2D baseTexture;
-          uniform sampler2D bloomTexture;
-          varying vec2 vUv;
-          void main() {
-            gl_FragColor = ( texture2D( baseTexture, vUv ) + vec4( 1.0 ) * texture2D( bloomTexture, vUv ) );
-          }
-        `,
-        defines: {}
-      }), 'baseTexture'
-    );
-    mixPass.needsSwap = true;
-    
-    // Final composer - combines everything
     this.finalComposer = new EffectComposer(this.renderer);
     this.finalComposer.addPass(renderScene);
-    this.finalComposer.addPass(mixPass);
+    this.finalComposer.addPass(bloomPass);
     
-    // Configure camera to see both layers
-    if (this.camera && this.camera.layers) {
-      this.camera.layers.enable(0); // Default layer for terrain
-      this.camera.layers.enable(this.BLOOM_SCENE); // Bloom layer for earthquakes
-      
-      console.log('Selective bloom setup complete');
-      console.log('Bloom pass threshold:', bloomPass.threshold);
-      console.log('Bloom pass strength:', bloomPass.strength);
-    }
+    console.log('Simple bloom setup complete');
   }
 
   setupCamera() {
@@ -419,12 +322,16 @@ class Application {
       console.timeEnd('parseGeom');
 
       const texture = new TextureLoader().load(mountainImage);
+      
+      // Set texture color space to SRGB for better color handling
+      texture.colorSpace = THREE.SRGBColorSpace;
+      
+      
       const material = new MeshLambertMaterial({
         wireframe: false,
         side: DoubleSide,
         map: texture,
-        // Set default brightness to 1.4 for better visibility
-        color: 0xf0f0f0, // Brighter base color (1.4x brightness approximation)
+        color: 0xe8e8e8, // white
         transparent: false, // Start with no transparency
         opacity: 1.0, // Start at full opacity
         alphaTest: 0, // Disable alpha testing
@@ -435,37 +342,28 @@ class Application {
       mountain.rotation.x = Math.PI / 2;
       
       // Flip the terrain mesh horizontally to correct the mirror image
-      // This ensures the terrain matches the correct geographic orientation
       mountain.scale.x = -1;
-      
-      // Explicitly ensure the mountain mesh is not in the bloom layer
-      mountain.layers.set(0); // Set to default layer (0), not bloom layer
-      mountain.userData.isTerrain = true; // Mark as terrain for layer management
       
       // Store reference to terrain mesh for opacity control
       this.terrainMesh = mountain;
       
-      // DEBUG: Log mountain mesh layer assignment
-      const testLayer0 = new THREE.Layers();
-      testLayer0.set(0);
-      const testBloomLayer = new THREE.Layers();
-      testBloomLayer.set(this.BLOOM_SCENE);
-      
-      console.log('Mountain mesh layers mask:', mountain.layers.mask);
-      console.log('Mountain mesh is on layer 0:', mountain.layers.test(testLayer0));
-      console.log('Mountain mesh is on bloom layer:', mountain.layers.test(testBloomLayer));
-      console.log('Mountain material color:', mountain.material.color.getHex().toString(16));
-      
       this.scene.add(mountain);
+
+
+      // Set terrain brightness to 4.2 directly
+      if (this.terrainMesh && this.terrainMesh.material) {
+        const originalColor = this.terrainMesh.material.color.clone();
+        const newColor = originalColor.multiplyScalar(4.2);
+        this.terrainMesh.material.color = newColor;
+        this.terrainMesh.material.needsUpdate = true;
+        console.log("Terrain brightness set to 4.2");
+      }
 
       // Now that terrain bounds are set up, initialize the earthquake overlay
       this.setupEarthquakeOverlay();
       
       // Set up terrain opacity control after terrain is created
       this.setupTerrainOpacityControl();
-      
-      // Set up terrain brightness control after terrain is created
-      this.setupTerrainBrightnessControl();
 
       const loader = document.getElementById('loader');
       loader.style.opacity = '-1';
@@ -480,14 +378,9 @@ class Application {
   }
 
   setupHelpers() {
-    const gridHelper = new GridHelper(1000, 40, 0x222222, 0x222222); // Very dark gray to prevent bloom
-    gridHelper.layers.set(0); // Set to default layer, not bloom
+    const gridHelper = new GridHelper(1000, 40, 0x222222, 0x222222);
     this.scene.add(gridHelper);
     
-    // DEBUG: Log grid helper layer
-    console.log('Grid helper layers mask:', gridHelper.layers.mask);
-    
-    // Initialize SVG compass rotation
     this.initCompassRotation();
   }
   
@@ -548,9 +441,6 @@ class Application {
     // Make sure the overlay is visible by default
     this.earthquakeOverlay.getObject3D().visible = true;
     
-    // Set the bloom scene layer for the earthquake overlay
-    this.earthquakeOverlay.setBloomLayer(this.BLOOM_SCENE);
-    
     // Add earthquake controls to the DOM
     const controls = createEarthquakeControls();
     document.body.appendChild(controls);
@@ -568,9 +458,6 @@ class Application {
     this.earthquakeOverlay.onVisualize = () => {
       this.configureEarthquakesForClicking();
     };
-    
-    // Configure the bloom layer
-    this.bloomLayer.set(this.BLOOM_SCENE);
     
     // Load earthquake data - use default one week period for initial load
     const oneWeekAgo = new Date();
@@ -694,61 +581,19 @@ class Application {
       if (this.terrainMesh && this.terrainMesh.material) {
         const opacity = event.detail.opacity;
         console.log("Setting terrain opacity to:", opacity);
-        console.log("Before - material opacity:", this.terrainMesh.material.opacity);
-        console.log("Before - material transparent:", this.terrainMesh.material.transparent);
         
-        // Set transparency based on opacity value
-        if (opacity < 1.0) {
-          this.terrainMesh.material.transparent = true;
-          this.terrainMesh.material.alphaTest = 0;
-        } else {
-          // When opacity is 1.0, disable transparency for full opacity
-          this.terrainMesh.material.transparent = false;
-          this.terrainMesh.material.alphaTest = 0;
-        }
-        
+        // Always enable transparency for opacity control
+        this.terrainMesh.material.transparent = true;
         this.terrainMesh.material.opacity = opacity;
+        
+        // Set proper alpha test and blending
+        this.terrainMesh.material.alphaTest = 0.01; // Small value to avoid z-fighting
+        this.terrainMesh.material.depthWrite = opacity >= 0.99; // Only write depth when nearly opaque
         this.terrainMesh.material.needsUpdate = true;
         
-        console.log("After - material opacity:", this.terrainMesh.material.opacity);
-        console.log("After - material transparent:", this.terrainMesh.material.transparent);
-        console.log("Material type:", this.terrainMesh.material.type);
-        
-        // Force a complete renderer state update to ensure changes take effect
-        this.renderer.state.reset();
-        
-        // Also invalidate any cached materials in the bloom system
-        this.materials = {};
+        console.log("Terrain opacity updated to:", opacity);
       } else {
         console.log("Terrain mesh not found for opacity change");
-      }
-    });
-  }
-  
-  setupTerrainBrightnessControl() {
-    // Store the original color for brightness adjustments
-    if (this.terrainMesh && this.terrainMesh.material && !this.terrainOriginalColor) {
-      this.terrainOriginalColor = this.terrainMesh.material.color.clone();
-    }
-    
-    // Listen for terrain brightness change events
-    document.addEventListener('terrainBrightnessChange', (event) => {
-      // Update terrain material brightness using direct reference
-      if (this.terrainMesh && this.terrainMesh.material && this.terrainOriginalColor) {
-        const brightness = event.detail.brightness;
-        console.log("Setting terrain brightness to:", brightness);
-        
-        // Adjust brightness by modifying the material color
-        const newColor = this.terrainOriginalColor.clone();
-        newColor.multiplyScalar(brightness);
-        
-        this.terrainMesh.material.color = newColor;
-        this.terrainMesh.material.needsUpdate = true;
-        
-        console.log("Terrain brightness updated to:", brightness);
-        console.log("New color RGB:", newColor.r.toFixed(3), newColor.g.toFixed(3), newColor.b.toFixed(3));
-      } else {
-        console.log("Terrain mesh or original color not found for brightness change");
       }
     });
   }
@@ -775,9 +620,6 @@ class Application {
     
     // Update the picking ray with the camera and mouse position
     this.raycaster.setFromCamera(this.mouse, this.camera);
-    
-    // Configure raycaster to work with both layers (earthquakes are on layers 0 and bloom)
-    this.raycaster.layers.enableAll(); // Enable all layers for intersection testing
     
     // Get all earthquake objects for intersection testing
     const earthquakeObjects = [];

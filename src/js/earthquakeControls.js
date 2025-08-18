@@ -210,54 +210,23 @@ export function createEarthquakeControls() {
     const opacityVal = parseFloat(event.target.value);
     opacityValue.textContent = opacityVal.toFixed(2);
     
-    // Dispatch a custom event that the main app can listen for
-    const opacityEvent = new CustomEvent('terrainOpacityChange', {
+    // Dispatch events for both terrain and earthquakes
+    const terrainOpacityEvent = new CustomEvent('terrainOpacityChange', {
       detail: { opacity: opacityVal }
     });
-    document.dispatchEvent(opacityEvent);
+    const earthquakeOpacityEvent = new CustomEvent('earthquakeOpacityChange', {
+      detail: { opacity: opacityVal }
+    });
+    document.dispatchEvent(terrainOpacityEvent);
+    document.dispatchEvent(earthquakeOpacityEvent);
   });
   
   opacityControlDiv.appendChild(opacityLabel);
   opacityControlDiv.appendChild(opacitySlider);
   opacityControlDiv.appendChild(opacityValue);
   
-  // Add terrain brightness control
-  const brightnessControlDiv = document.createElement('div');
-  brightnessControlDiv.style.marginTop = '10px';
-  
-  const brightnessLabel = document.createElement('label');
-  brightnessLabel.textContent = 'Terrain Brightness: ';
-  brightnessLabel.style.display = 'block';
-  brightnessLabel.style.marginBottom = '5px';
-  
-  const brightnessSlider = document.createElement('input');
-  brightnessSlider.type = 'range';
-  brightnessSlider.min = '0.1';
-  brightnessSlider.max = '2.0';
-  brightnessSlider.step = '0.05';
-  brightnessSlider.value = '1.0';
-  brightnessSlider.style.width = '100%';
-  
-  // Add value display
-  const brightnessValue = document.createElement('span');
-  brightnessValue.textContent = '1.00';
-  brightnessValue.style.marginLeft = '10px';
-  brightnessValue.style.fontSize = '12px';
-  
-  brightnessSlider.addEventListener('input', (event) => {
-    const brightnessVal = parseFloat(event.target.value);
-    brightnessValue.textContent = brightnessVal.toFixed(2);
-    
-    // Dispatch a custom event that the main app can listen for
-    const brightnessEvent = new CustomEvent('terrainBrightnessChange', {
-      detail: { brightness: brightnessVal }
-    });
-    document.dispatchEvent(brightnessEvent);
-  });
-  
-  brightnessControlDiv.appendChild(brightnessLabel);
-  brightnessControlDiv.appendChild(brightnessSlider);
-  brightnessControlDiv.appendChild(brightnessValue);
+
+
   
   const infoDiv = document.createElement('div');
   infoDiv.id = 'earthquake-info';
@@ -277,7 +246,6 @@ export function createEarthquakeControls() {
   container.appendChild(dateRangeDiv);
   container.appendChild(bloomControlDiv);
   container.appendChild(opacityControlDiv);
-  container.appendChild(brightnessControlDiv);
   container.appendChild(infoDiv);
   return container;
 }
