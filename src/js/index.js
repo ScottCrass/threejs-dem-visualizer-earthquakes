@@ -347,8 +347,6 @@ class Application {
       // Store reference to terrain mesh for opacity control
       this.terrainMesh = mountain;
       
-
-      
       this.scene.add(mountain);
 
 
@@ -492,6 +490,7 @@ class Application {
       this.mouseDownPosition.x = event.clientX;
       this.mouseDownPosition.y = event.clientY;
       this.isDragging = false;
+
     });
     
     this.renderer.domElement.addEventListener('mousemove', (event) => {
@@ -603,7 +602,7 @@ class Application {
         });
     });
   }
-  
+
   setupTerrainOpacityControl() {
     // Listen for terrain opacity change events
     document.addEventListener('terrainOpacityChange', (event) => {
@@ -637,17 +636,7 @@ class Application {
       return;
     }
     
-    // Two-click system: First click pauses timeline, second click selects earthquake
-    if (this.earthquakeOverlay.isPlaying) {
-      // First click - pause the timeline
-      console.log('First click: pausing timeline');
-      this.earthquakeOverlay.pause();
-      return; // Don't check for earthquake intersection on first click
-    }
-    
-    // Second click (timeline already paused) - check for earthquake selection
-    console.log('Second click: checking for earthquake selection');
-    
+    // Remove two-click system: always check for intersection on click
     // Update the picking ray with the camera and mouse position
     this.raycaster.setFromCamera(this.mouse, this.camera);
     
@@ -671,13 +660,9 @@ class Application {
       if (intersects.length > 0) {
         const earthquakeObject = intersects[0];
         const earthquake = earthquakeObject.object.userData.earthquake;
-        
+        const featureId = earthquakeObject.object.userData.featureId;
+
         if (earthquake) {
-          // Pause the timeline when an earthquake is clicked for better interaction
-          console.log('Earthquake clicked, pausing timeline. Was playing:', this.earthquakeOverlay.isPlaying);
-          this.earthquakeOverlay.pause();
-          console.log('Timeline paused. Now playing:', this.earthquakeOverlay.isPlaying);
-          
           // Build the popup content with earthquake details
           let popupContent = `
             <strong>${earthquake.place || 'Unknown location'}</strong><br>
@@ -685,24 +670,21 @@ class Application {
             Depth: ${earthquakeObject.object.userData.depth.toFixed(2)} km<br>
             Time: ${new Date(earthquake.time).toLocaleString()}<br>
           `;
-          
+
           // Add USGS link if available
           if (earthquake.url) {
             popupContent += `<br><a href="${earthquake.url}" target="_blank" style="color: #0066cc; text-decoration: underline;">View at USGS.GOV</a>`;
           }
-          
+
           infoDiv.style.display = 'block';
           infoDiv.innerHTML = popupContent;
-          
-          // Highlight the clicked earthquake temporarily
-          const originalColor = earthquakeObject.object.material.color.clone();
-          earthquakeObject.object.material.color.setRGB(1, 1, 1); // White highlight
-          setTimeout(() => {
-            earthquakeObject.object.material.color.copy(originalColor);
-          }, 1000);
+
+          // Use encapsulated selection method
+          this.earthquakeOverlay.setSelectedEarthquake(featureId, this.terrainBounds);
         }
       } else {
-        console.log('No earthquake intersections found');
+        // No intersection: clear highlight and info
+        this.earthquakeOverlay.clearSelectedEarthquake(this.terrainBounds);
         infoDiv.style.display = 'none';
       }
     }
