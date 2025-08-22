@@ -12,12 +12,6 @@ import {
   Color,
 } from 'three';
 
-/**
- * EarthquakeOverlay
- * - Loads and visualizes earthquake data from the USGS API.
- * - Supports timeline playback and filtering.
- * - Renders spheres and lines for each earthquake, with color and bloom based on age.
- */
 export class EarthquakeOverlay {
   constructor() {
     this.group = new Group();
@@ -37,25 +31,13 @@ export class EarthquakeOverlay {
     this.onVisualize = null;
 
     this.bloomLayer = 1;
-
-    this.selectedFeatureId = null; // Track selected earthquake
+    this.selectedFeatureId = null;
   }
 
-  /**
-   * Set the layer to use for bloom effect.
-   * @param {number} layer
-   */
   setBloomLayer(layer) {
     this.bloomLayer = layer;
   }
 
-  /**
-   * Load earthquake data from USGS API for given bounds and date range.
-   * @param {Object} bounds - {minLat, maxLat, minLon, maxLon}
-   * @param {string} startDate - YYYY-MM-DD
-   * @param {string} endDate - YYYY-MM-DD (optional)
-   * @returns {Promise}
-   */
   async loadData(bounds = { minLat: 50, maxLat: 72, minLon: -190, maxLon: -129 }, startDate = '2025-07-01', endDate = null) {
     this.isLoading = true;
     try {
@@ -83,9 +65,6 @@ export class EarthquakeOverlay {
     }
   }
 
-  /**
-   * Remove all earthquake visuals and data.
-   */
   clearData() {
     this.earthquakeData = [];
     while (this.group.children.length > 0) {
@@ -101,14 +80,6 @@ export class EarthquakeOverlay {
     this.currentTime = null;
   }
 
-  /**
-   * Convert geographic coordinates to terrain mesh coordinates.
-   * @param {number} lat
-   * @param {number} lon
-   * @param {number} depth - in km
-   * @param {Object} terrainBounds
-   * @returns {{x, y, z}}
-   */
   geoToTerrain(lat, lon, depth, terrainBounds) {
     let x = ((lon - terrainBounds.minLon) / (terrainBounds.maxLon - terrainBounds.minLon)) * terrainBounds.width - (terrainBounds.width / 2);
     const y = ((lat - terrainBounds.minLat) / (terrainBounds.maxLat - terrainBounds.minLat)) * terrainBounds.height - (terrainBounds.height / 2);
@@ -118,11 +89,6 @@ export class EarthquakeOverlay {
     return { x, y, z };
   }
 
-  /**
-   * Visualize all earthquakes as spheres and lines.
-   * @param {Object} terrainBounds
-   * @param {number|null} timeFilter
-   */
   visualize(terrainBounds, timeFilter = null) {
     if (!this.earthquakeData.length) return;
 
@@ -140,17 +106,16 @@ export class EarthquakeOverlay {
       const position = this.geoToTerrain(lat, lon, depth, terrainBounds);
 
       const baseSize = Math.max(2, mag * 12);
-
       const referenceTime = timeFilter || Date.now();
       const ageInMs = referenceTime - time;
       const ageInHours = ageInMs / (1000 * 60 * 60);
 
-      // ----- scale
+      // scale
       let scale = 1.0;
       if (ageInHours >= 0 && ageInHours < 1) scale = ageInHours;
       else if (ageInHours < 0) scale = 0;
 
-      // ----- opacity
+      // opacity
       let opacity = 1.0;
       if (ageInHours > 48) {
         const fade = Math.max(0, 1 - (ageInHours - 48) / (24 * 5));
@@ -159,39 +124,22 @@ export class EarthquakeOverlay {
         opacity = 0;
       }
 
-      // ----- color
-      let color;
-      if (ageInHours < 0) color = 0x000000;
-      else if (ageInHours <= 2) color = 0xff0000;
-      else if (ageInHours <= 48) {
-        const normalizedAge = (ageInHours - 2) / (48 - 2);
-        const r = 255;
-        const g = Math.floor(165 * normalizedAge);
-        color = (r << 16) | (g << 8);
-      } else if (ageInHours <= 168) {
-        const t = Math.min(1, (ageInHours - 48) / (168 - 48));
-        const r = Math.round(255 * (1 - t));
-        const g = Math.round(255 * (1 - t) + 128 * t);
-        const b = Math.round(255 * t);
-        color = (r << 16) | (g << 8) | b;
-      } else {
-        color = 0x0080ff;
-      }
-
-      // ----- bloom
+      // color
+      const baseColor = this.ageColor(ageInHours);
       let bloomMultiplier;
       if (ageInHours <= 2 && ageInHours >= 0) bloomMultiplier = 12.0;
       else if (ageInHours > 2 && ageInHours <= 12) bloomMultiplier = 12.0 - ((ageInHours - 2) / 10) * 6.0;
       else if (ageInHours > 12 && ageInHours <= 48) bloomMultiplier = 6.0 - ((ageInHours - 12) / 36) * 4.0;
       else bloomMultiplier = 1.2;
-      const bloomColor = new Color(color).multiplyScalar(bloomMultiplier);
+      const bloomColor = new Color(baseColor).multiplyScalar(bloomMultiplier);
 
-      // ----- reuse or create
+      // reuse or create
       let entry = this.earthquakeVisualMap.get(feature.id);
       if (!entry) {
-        const sphereGeometry = new SphereGeometry(baseSize * 2, 8, 8);
-        const material = new MeshBasicMaterial({ color: bloomColor, transparent: true, opacity });
+        const sphereGeometry = new SphereGeometry(baseSize * 2, 16, 16);
+        const material = new MeshBasicMaterial({ color: bloomColor, transparent: true, opacity: 1.0 });
         const sphere = new Mesh(sphereGeometry, material);
+        sphere.position.set(position.x, position.z, position.y);
         sphere.layers.set(0);
         sphere.layers.enable(this.bloomLayer);
         sphere.frustumCulled = false;
@@ -200,9 +148,9 @@ export class EarthquakeOverlay {
         const lineGeometry = new BufferGeometry();
         const lineVertices = new Float32Array([position.x, 0, position.y, position.x, position.z, position.y]);
         lineGeometry.setAttribute('position', new Float32BufferAttribute(lineVertices, 3));
-        const lineMaterial = new LineBasicMaterial({ color: new Color(color).multiplyScalar(2.0), transparent: true, opacity });
+        const lineMaterial = new LineBasicMaterial({ color: new Color(baseColor).multiplyScalar(2.0), transparent: true, opacity: 1.0 });
         const line = new Line(lineGeometry, lineMaterial);
-        line.layers.mask = 1 | (1 << this.bloomLayer);
+        line.layers.set(0);
 
         this.group.add(sphere);
         this.group.add(line);
@@ -217,7 +165,7 @@ export class EarthquakeOverlay {
         this.earthquakeVisualMap.set(feature.id, entry);
       }
 
-      // ----- update transforms & materials
+      // update
       entry.sphere.position.set(position.x, position.z, position.y);
       entry.sphere.scale.setScalar(3.0 * scale);
       entry.sphere.material.color.copy(bloomColor);
@@ -228,74 +176,10 @@ export class EarthquakeOverlay {
         position.x, position.z, position.y
       ]);
       entry.line.geometry.attributes.position.needsUpdate = true;
-      entry.line.material.color.set(new Color(color).multiplyScalar(2.0));
+      entry.line.material.color.set(new Color(baseColor).multiplyScalar(2.0));
       entry.line.material.opacity = opacity;
 
       activeIds.add(feature.id);
-      
-      bloomColor.multiplyScalar(bloomMultiplier);
-      
-      // Create a sphere for the earthquake with higher quality geometry
-      const sphereGeometry = new SphereGeometry(size * 2, 16, 16); // Increased segments for smoother bloom
-      
-      // Use a simple MeshBasicMaterial for better bloom performance
-      const material = new MeshBasicMaterial({
-        color: bloomColor,
-        transparent: true,
-        opacity: 1.0, // Full opacity - let bloom layer handle the glow
-      });
-      
-      const sphere = new Mesh(sphereGeometry, material);
-      sphere.position.set(position.x, position.z, position.y); // Note the swapped y and z for Three.js
-      
-      // Set earthquake on both layers for proper functionality:
-      // - Layer 0 for raycasting and terrain compatibility
-      // - Bloom layer for glow effect
-      sphere.layers.set(0); // Start with layer 0 (raycasting)
-      sphere.layers.enable(this.bloomLayer); // Add bloom layer for glow
-      
-      // DEBUG: Log actual layer mask after setting
-      console.log(`Earthquake sphere created - bloomLayer: ${this.bloomLayer}, layers mask: ${sphere.layers.mask}`);
-      
-      // Scale up immediately for easier clicking (no delayed scaling)
-      sphere.scale.setScalar(3.0);
-      
-      // CRITICAL FIX: Disable frustum culling to ensure earthquakes are always raycastable
-      // This prevents Three.js from culling small spheres that appear outside the camera frustum
-      sphere.frustumCulled = false;
-      
-      // Add user data for interaction
-      sphere.userData = {
-        earthquake: feature.properties,
-        depth,
-        magnitude: mag,
-        time,
-        isEarthquake: true // Flag to identify as an earthquake object
-      };
-      
-      // Add a line from the surface to the earthquake depth
-      const lineGeometry = new BufferGeometry();
-      const lineVertices = new Float32Array([
-        position.x, 0, position.y,
-        position.x, position.z, position.y
-      ]);
-      lineGeometry.setAttribute('position', new Float32BufferAttribute(lineVertices, 3));
-      
-      const lineMaterial = new LineBasicMaterial({
-        color: new Color(this.ageColor(ageInHours)).multiplyScalar(2.0), // Color matches sphere now
-        transparent: true,
-        opacity: 1 // Fixed opacity for consistent glow
-      });
-      
-      const line = new Line(lineGeometry, lineMaterial);
-      
-      // Put lines only on layer 0 (non-bloom layer) to avoid bloom artifacts
-      line.layers.set(0); // Only layer 0, not bloom layer
-    
-      // No age-based opacity changes - keep lines consistent
-      
-      this.group.add(sphere);
-      this.group.add(line);
     });
 
     // cleanup old
@@ -311,20 +195,12 @@ export class EarthquakeOverlay {
       }
     }
 
-    // keep highlight alive
     if (this.selectedFeatureId && this.earthquakeVisualMap.has(this.selectedFeatureId)) {
       this.highlightEarthquake(this.selectedFeatureId);
     }
 
     if (this.onVisualize) this.onVisualize();
   }
-
-
-  /**
-   * Get color for an earthquake based on age (in hours).
-   * @param {number} ageInHours
-   * @returns {number} - hex color
-   */
 
   ageColor(ageInHours) {
     if (ageInHours < 0) return 0xff0000;
@@ -340,30 +216,16 @@ export class EarthquakeOverlay {
     }
   }
 
-  /**
-   * Toggle overlay visibility.
-   * @returns {boolean}
-   */
   toggle() {
     this.visible = !this.visible;
     this.group.visible = this.visible;
     return this.visible;
   }
 
-  /**
-   * Get the Three.js group for this overlay.
-   * @returns {Group}
-   */
   getObject3D() {
     return this.group;
   }
 
-  /**
-   * Find the closest earthquake to a given position.
-   * @param {Vector3} position
-   * @param {number} maxDistance
-   * @returns {Object|null}
-   */
   findClosestEarthquake(position, maxDistance = 50) {
     let closest = null;
     let minDistance = maxDistance;
@@ -379,10 +241,6 @@ export class EarthquakeOverlay {
     return closest ? closest.userData : null;
   }
 
-  /**
-   * Start playback animation.
-   * @param {Object} terrainBounds
-   */
   play(terrainBounds) {
     if (!this.timeRange.start || !this.timeRange.end) return;
     if (this.manuallyPaused) return;
@@ -392,9 +250,6 @@ export class EarthquakeOverlay {
     this.animate(terrainBounds);
   }
 
-  /**
-   * Pause playback animation.
-   */
   pause() {
     this.isPlaying = false;
     this.manuallyPaused = true;
@@ -404,10 +259,6 @@ export class EarthquakeOverlay {
     }
   }
 
-  /**
-   * Stop playback and reset to start.
-   * @param {Object} terrainBounds
-   */
   stop(terrainBounds) {
     this.isPlaying = false;
     if (this.animationId) {
@@ -419,21 +270,12 @@ export class EarthquakeOverlay {
     this.visualize(terrainBounds, this.currentTime);
   }
 
-  /**
-   * Set current time (e.g. from timeline slider).
-   * @param {number} time
-   * @param {Object} terrainBounds
-   */
   setTime(time, terrainBounds) {
     this.currentTime = time;
     if (this.onTimeChange) this.onTimeChange(this.currentTime);
     this.visualize(terrainBounds, this.currentTime);
   }
 
-  /**
-   * Animation loop for playback.
-   * @param {Object} terrainBounds
-   */
   animate(terrainBounds) {
     if (!this.isPlaying) return;
     const now = Date.now();
@@ -454,18 +296,12 @@ export class EarthquakeOverlay {
     }
   }
 
-  /**
-   * Set playback speed (days per second).
-   * @param {number} speed
-   */
   setPlaybackSpeed(speed) {
     this.playbackSpeed = speed;
   }
 
-  // Add highlight and unhighlight methods for selection
   highlightEarthquake(featureId) {
     if (!this.earthquakeVisualMap) return;
-    // Unhighlight all first to ensure only one is highlighted
     for (const [id, visual] of this.earthquakeVisualMap.entries()) {
       if (id !== featureId) {
         visual.sphere.material.color.copy(visual.originalColor);
@@ -500,38 +336,24 @@ export class EarthquakeOverlay {
     }
   }
 
-  /**
-   * Set the selected earthquake by featureId.
-   * @param {string|null} featureId
-   * @param {Object} terrainBounds
-   */
   setSelectedEarthquake(featureId) {
     if (this.selectedFeatureId === featureId) return;
-    // Unhighlight previous selection if any
     if (this.selectedFeatureId && this.earthquakeVisualMap) {
       this.unhighlightEarthquake(this.selectedFeatureId);
     }
     this.selectedFeatureId = featureId;
-    // Only highlight if visuals exist for this featureId
     if (this.earthquakeVisualMap && featureId) {
       this.highlightEarthquake(featureId);
     }
   }
 
-  /**
-   * Clear the selected earthquake.
-   * @param {Object} terrainBounds
-   */
-
   clearSelectedEarthquake(_terrainBounds) {
     if (this.selectedFeatureId !== null) {
       if (this.earthquakeVisualMap) {
         this.unhighlightEarthquake(this.selectedFeatureId);
-        console.log(_terrainBounds);
       }
       this.selectedFeatureId = null;
       this.visualize(_terrainBounds, this.currentTime);
     }
   }
-
 }
