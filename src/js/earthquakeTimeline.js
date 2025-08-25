@@ -38,8 +38,10 @@ export function createEarthquakeTimeline(earthquakeOverlay, terrainBounds) {
   
   const currentTimeDisplay = document.createElement('div');
   currentTimeDisplay.textContent = 'N/A';
-  currentTimeDisplay.style.width = '180px';
+  currentTimeDisplay.style.width = '220px'; // Increased width for better spacing
+  currentTimeDisplay.style.minWidth = '220px'; // Ensure minimum width
   currentTimeDisplay.style.textAlign = 'right';
+  currentTimeDisplay.style.fontSize = '12px'; // Slightly smaller font to fit better
   
   sliderContainer.appendChild(timeLabel);
   sliderContainer.appendChild(slider);
@@ -72,6 +74,10 @@ export function createEarthquakeTimeline(earthquakeOverlay, terrainBounds) {
   const speedSelect = document.createElement('select');
   speedSelect.style.padding = '5px';
   speedSelect.style.cursor = 'pointer';
+  speedSelect.style.backgroundColor = 'rgba(0, 0, 0, 0.8)'; // Dark background
+  speedSelect.style.color = 'white'; // White text
+  speedSelect.style.border = '1px solid rgba(255, 255, 255, 0.4)';
+  speedSelect.style.borderRadius = '4px';
   
   // Add speed options (days per second)
   const speedOptions = [
@@ -87,6 +93,8 @@ export function createEarthquakeTimeline(earthquakeOverlay, terrainBounds) {
     const optElement = document.createElement('option');
     optElement.value = option.value;
     optElement.textContent = option.label;
+    optElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)'; // Dark background for options
+    optElement.style.color = 'white'; // White text for options
     speedSelect.appendChild(optElement);
   });
   

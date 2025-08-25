@@ -470,7 +470,7 @@ class Application {
     this.earthquakeOverlay.loadData(this.terrainBounds, startDate, endDate)
       .then(() => {
         // After data is loaded, visualize it with time filtering
-        this.earthquakeOverlay.visualize(this.terrainBounds, this.earthquakeOverlay.currentTime);
+        this.earthquakeOverlay.visualize(this.terrainBounds, this.earthquakeOverlay.currentTime, this.terrainMesh);
         console.log('Earthquake data visualized');
         
         // Configure earthquake objects for interaction
@@ -587,7 +587,7 @@ class Application {
       this.earthquakeOverlay.loadData(this.terrainBounds, startDate, endDate)
         .then(() => {
           // After data is loaded, visualize it
-          this.earthquakeOverlay.visualize(this.terrainBounds, this.earthquakeOverlay.currentTime);
+          this.earthquakeOverlay.visualize(this.terrainBounds, this.earthquakeOverlay.currentTime, this.terrainMesh);
           console.log(`Earthquake data loaded and visualized for period ${startDate} to ${endDate}`);
           
           // Configure earthquake objects for interaction

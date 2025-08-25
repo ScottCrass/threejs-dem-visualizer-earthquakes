@@ -32,6 +32,7 @@ export class EarthquakeOverlay {
 
     this.bloomLayer = 1;
     this.selectedFeatureId = null;
+    this.terrainMesh = null; // Store reference to terrain mesh for filtering
   }
 
   setBloomLayer(layer) {
@@ -89,8 +90,13 @@ export class EarthquakeOverlay {
     return { x, y, z };
   }
 
-  visualize(terrainBounds, timeFilter = null) {
+  visualize(terrainBounds, timeFilter = null, terrainMesh = null) {
     if (!this.earthquakeData.length) return;
+
+    // Store terrain mesh reference for use in other methods
+    if (terrainMesh) {
+      this.terrainMesh = terrainMesh;
+    }
 
     if (!this.earthquakeVisualMap) {
       this.earthquakeVisualMap = new Map();
@@ -105,14 +111,22 @@ export class EarthquakeOverlay {
       const [lon, lat, depth] = coordinates;
       const position = this.geoToTerrain(lat, lon, depth, terrainBounds);
 
-      const baseSize = Math.max(2, mag * 12);
+      // Filter out earthquakes above terrain if terrain mesh is provided
+      if (this.terrainMesh) {
+        const terrainHeight = this.getTerrainHeightAt(position.x, position.y, this.terrainMesh);
+        if (position.z > terrainHeight) {
+          return; // Skip this earthquake - it's above terrain
+        }
+      }
+
+      const baseSize = Math.max(2, mag * 5);
       const referenceTime = timeFilter || Date.now();
       const ageInMs = referenceTime - time;
       const ageInHours = ageInMs / (1000 * 60 * 60);
 
       // scale
       let scale = 1.0;
-      if (ageInHours >= 0 && ageInHours < 1) scale = ageInHours;
+      if (ageInHours >= 0 && ageInHours < 1) scale = Math.max(0.1, ageInHours); // Minimum scale of 0.1 for visibility
       else if (ageInHours < 0) scale = 0;
 
       // opacity
@@ -267,13 +281,13 @@ export class EarthquakeOverlay {
     }
     this.currentTime = this.timeRange.start;
     if (this.onTimeChange) this.onTimeChange(this.currentTime);
-    this.visualize(terrainBounds, this.currentTime);
+    this.visualize(terrainBounds, this.currentTime, this.terrainMesh);
   }
 
   setTime(time, terrainBounds) {
     this.currentTime = time;
     if (this.onTimeChange) this.onTimeChange(this.currentTime);
-    this.visualize(terrainBounds, this.currentTime);
+    this.visualize(terrainBounds, this.currentTime, this.terrainMesh);
   }
 
   animate(terrainBounds) {
@@ -287,7 +301,7 @@ export class EarthquakeOverlay {
       this.currentTime = this.timeRange.end;
       this.isPlaying = false;
     }
-    this.visualize(terrainBounds, this.currentTime);
+    this.visualize(terrainBounds, this.currentTime, this.terrainMesh);
     if (this.onTimeChange) this.onTimeChange(this.currentTime);
     if (this.isPlaying) {
       this.animationId = requestAnimationFrame(() => this.animate(terrainBounds));
@@ -302,20 +316,15 @@ export class EarthquakeOverlay {
 
   highlightEarthquake(featureId) {
     if (!this.earthquakeVisualMap) return;
-    for (const [id, visual] of this.earthquakeVisualMap.entries()) {
-      if (id !== featureId) {
-        visual.sphere.material.color.copy(visual.originalColor);
-        visual.line.material.color.copy(visual.originalLineColor);
-        visual.sphere.material.opacity = visual.originalOpacity;
-        visual.line.material.opacity = visual.originalOpacity;
-        visual.sphere.material.needsUpdate = true;
-        visual.line.material.needsUpdate = true;
-      }
-    }
+    
+    // Don't restore other earthquakes here - visualize() already sets correct colors
+    // Just highlight the selected one
     const visual = this.earthquakeVisualMap.get(featureId);
     if (visual) {
-      visual.sphere.material.color.setRGB(1, 1, 1);
-      visual.line.material.color.setRGB(1, 1, 1);
+      // Use a moderate highlight color instead of pure white
+      // This prevents excessive bloom
+      visual.sphere.material.color.setRGB(0.8, 0.8, 0.3); // Bright yellow instead of white
+      visual.line.material.color.setRGB(0.8, 0.8, 0.3);
       visual.sphere.material.opacity = 1.0;
       visual.line.material.opacity = 1.0;
       visual.sphere.material.needsUpdate = true;
@@ -336,24 +345,57 @@ export class EarthquakeOverlay {
     }
   }
 
-  setSelectedEarthquake(featureId) {
+  setSelectedEarthquake(featureId, terrainBounds) {
     if (this.selectedFeatureId === featureId) return;
-    if (this.selectedFeatureId && this.earthquakeVisualMap) {
-      this.unhighlightEarthquake(this.selectedFeatureId);
-    }
+    
+    const previousSelection = this.selectedFeatureId;
     this.selectedFeatureId = featureId;
-    if (this.earthquakeVisualMap && featureId) {
+    
+    if (previousSelection && this.earthquakeVisualMap) {
+      // Re-visualize to restore correct colors for all earthquakes
+      this.visualize(terrainBounds, this.currentTime, this.terrainMesh);
+    } else if (this.earthquakeVisualMap && featureId) {
       this.highlightEarthquake(featureId);
     }
   }
 
-  clearSelectedEarthquake(_terrainBounds) {
+  clearSelectedEarthquake(terrainBounds) {
     if (this.selectedFeatureId !== null) {
-      if (this.earthquakeVisualMap) {
-        this.unhighlightEarthquake(this.selectedFeatureId);
-      }
       this.selectedFeatureId = null;
-      this.visualize(_terrainBounds, this.currentTime);
+      // Just re-visualize to restore proper colors
+      this.visualize(terrainBounds, this.currentTime, this.terrainMesh);
     }
+  }
+
+  // Helper method to get terrain height at a specific position
+  getTerrainHeightAt(x, y, terrainMesh) {
+    if (!terrainMesh || !terrainMesh.geometry) return 0;
+    
+    // Get the terrain geometry
+    const geometry = terrainMesh.geometry;
+    const position = geometry.attributes.position;
+    
+    if (!position) return 0;
+    
+    // Get terrain dimensions - assuming it's a PlaneGeometry or similar
+    const terrainWidth = terrainMesh.scale.x;
+    const terrainHeight = terrainMesh.scale.z;
+    
+    // Convert world coordinates to terrain UV coordinates
+    const u = (x + terrainWidth / 2) / terrainWidth;
+    const v = (y + terrainHeight / 2) / terrainHeight;
+    
+    // Clamp to terrain bounds
+    if (u < 0 || u > 1 || v < 0 || v > 1) return 0;
+    
+    // For now, return a simple approximation
+    // In a more sophisticated implementation, you would:
+    // 1. Sample the actual height map texture
+    // 2. Or interpolate between nearby vertices
+    // 3. Or use raycasting against the terrain mesh
+    
+    // Simple approximation: assume terrain is roughly at y=0 to y=100
+    // and earthquakes below y=0 are underground
+    return 0;
   }
 }
