@@ -19,6 +19,27 @@ export function createEarthquakeControls() {
   title.style.margin = '0 0 10px 0';
   title.style.fontSize = '14px';
   title.style.fontWeight = 'bold';
+  title.style.paddingRight = '80px'; // Add padding to prevent overlap with toggle button
+
+  // Create toggle button for hiding/showing controls
+  const toggleButton = document.createElement('button');
+  toggleButton.textContent = '▲ Hide';
+  toggleButton.style.position = 'absolute';
+  toggleButton.style.top = '5px';
+  toggleButton.style.right = '10px';
+  toggleButton.style.padding = '5px 12px'; // Increased padding for better spacing
+  toggleButton.style.cursor = 'pointer';
+  toggleButton.style.fontSize = '11px';
+  toggleButton.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+  toggleButton.style.border = '1px solid rgba(255, 255, 255, 0.4)';
+  toggleButton.style.borderRadius = '3px';
+  toggleButton.style.color = 'white';
+  toggleButton.style.zIndex = '1001';
+  toggleButton.style.minWidth = '60px'; // Ensure consistent width
+
+  // Create collapsible content container
+  const contentContainer = document.createElement('div');
+  contentContainer.className = 'controls-content';
   
   // Add compass toggle
   const compassToggleDiv = document.createElement('div');
@@ -278,11 +299,34 @@ export function createEarthquakeControls() {
   infoDiv.style.maxWidth = '200px';
   infoDiv.style.wordWrap = 'break-word';
   
+  // Add all collapsible content to content container
+  contentContainer.appendChild(compassToggleDiv);
+  contentContainer.appendChild(dateRangeDiv);
+  contentContainer.appendChild(bloomControlDiv);
+  contentContainer.appendChild(opacityControlDiv);
+  contentContainer.appendChild(brightnessControlDiv);
+  contentContainer.appendChild(infoDiv);
+
+  // Add toggle functionality
+  let isCollapsed = false;
+  toggleButton.addEventListener('click', () => {
+    isCollapsed = !isCollapsed;
+    if (isCollapsed) {
+      contentContainer.style.display = 'none';
+      toggleButton.textContent = '▼ Show';
+      container.style.padding = '10px'; // Keep normal padding
+      title.style.marginBottom = '5px'; // Reduce title margin
+    } else {
+      contentContainer.style.display = 'block';
+      toggleButton.textContent = '▲ Hide';
+      container.style.padding = '10px'; // Keep normal padding
+      title.style.marginBottom = '10px'; // Restore title margin
+    }
+  });
+
+  // Add everything to the container
   container.appendChild(title);
-  container.appendChild(compassToggleDiv);
-  container.appendChild(dateRangeDiv);
-  container.appendChild(bloomControlDiv);
-  container.appendChild(opacityControlDiv);
-  container.appendChild(infoDiv);
+  container.appendChild(toggleButton);
+  container.appendChild(contentContainer);
   return container;
 }

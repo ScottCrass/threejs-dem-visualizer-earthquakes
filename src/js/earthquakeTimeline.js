@@ -9,7 +9,7 @@ export function createEarthquakeTimeline(earthquakeOverlay, terrainBounds) {
   container.style.left = '10px';
   container.style.right = '10px';
   container.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-  container.style.padding = '10px';
+  container.style.padding = '30px 10px 10px 10px'; // Add top padding for toggle button
   container.style.borderRadius = '5px';
   container.style.zIndex = '1000';
   container.style.color = 'white';
@@ -47,6 +47,26 @@ export function createEarthquakeTimeline(earthquakeOverlay, terrainBounds) {
   sliderContainer.appendChild(slider);
   sliderContainer.appendChild(currentTimeDisplay);
   
+  // Create toggle button for hiding/showing timeline
+  const toggleButton = document.createElement('button');
+  toggleButton.textContent = '▲ Hide';
+  toggleButton.style.position = 'absolute';
+  toggleButton.style.top = '5px';
+  toggleButton.style.right = '10px';
+  toggleButton.style.padding = '5px 12px'; // Increased padding for better spacing
+  toggleButton.style.cursor = 'pointer';
+  toggleButton.style.fontSize = '11px';
+  toggleButton.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+  toggleButton.style.border = '1px solid rgba(255, 255, 255, 0.4)';
+  toggleButton.style.borderRadius = '3px';
+  toggleButton.style.color = 'white';
+  toggleButton.style.zIndex = '1001';
+  toggleButton.style.minWidth = '60px'; // Ensure consistent width
+
+  // Create collapsible content container
+  const contentContainer = document.createElement('div');
+  contentContainer.className = 'timeline-content';
+
   // Create playback controls
   const controlsContainer = document.createElement('div');
   controlsContainer.style.display = 'flex';
@@ -112,9 +132,28 @@ export function createEarthquakeTimeline(earthquakeOverlay, terrainBounds) {
   controlsContainer.appendChild(speedSelect);
   controlsContainer.appendChild(dateRangeDisplay);
   
+  // Add content to content container
+  contentContainer.appendChild(sliderContainer);
+  contentContainer.appendChild(controlsContainer);
+
+  // Add toggle functionality
+  let isCollapsed = false;
+  toggleButton.addEventListener('click', () => {
+    isCollapsed = !isCollapsed;
+    if (isCollapsed) {
+      contentContainer.style.display = 'none';
+      toggleButton.textContent = '▼ Show';
+      container.style.padding = '30px 10px 5px 10px'; // Keep top padding for button
+    } else {
+      contentContainer.style.display = 'block';
+      toggleButton.textContent = '▲ Hide';
+      container.style.padding = '30px 10px 10px 10px'; // Restore full padding with top space
+    }
+  });
+
   // Add everything to the container
-  container.appendChild(sliderContainer);
-  container.appendChild(controlsContainer);
+  container.appendChild(toggleButton);
+  container.appendChild(contentContainer);
   
   // Format date for display
   function formatDate(timestamp) {
